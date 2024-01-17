@@ -1,0 +1,95 @@
+// Navy ~ 0.1-lite
+// ^^^ First comment should provide a NavyJS version
+
+// Meta tag
+[OVERLAY name=Custom, ctx=Canvas, author=ChartMaster, version=1.0.0]
+
+// Define new props
+// (the same as in 'settings.props' of Overlay object)
+prop('radius', { type: 'number', def: 5 })
+
+// Any variables/constants
+const _3Y = 60 * 60 * 24 * 365 * 3 * 1000;
+const markers = [];
+
+// Draw function (called on each update)
+// Library provides a lot of useful variables to make
+// overlays ($core in the main collection)
+function draw(ctx) {
+    ctx.strokeStyle = $props.back;
+    ctx.lineWidth = 1;
+    const layout = $core.layout;
+    const data = $core.data; // Full dataset
+    const view = $core.view; // Visible view
+    let radius = $props.radius;
+
+    for (var i = view.i1, n = view.i2; i <= n; i++) {
+        ctx.beginPath();
+        let p = data[i];
+        // Mapping function used to transform values into
+        // coordinates
+        let x = layout.time2x(p[0]);
+        let y = layout.value2y(p[1]);
+        ctx.moveTo(x - radius, y + radius); // начинаем от левого нижнего угла
+        ctx.lineTo(x + radius *2, y + radius); // линия к правому нижнему углу
+        ctx.lineTo(x, y - radius * 5); 
+        ctx.moveTo(x - radius, y + radius * 2);
+        ctx.fillStyle = gradient(p[1]);
+        ctx.arc(x, y, radius, 0, Math.PI * 2, false);
+        ctx.fill();
+    }
+    // Отрисовка маркеров
+    for (const marker of markers) {
+        const x = layout.time2x(marker.date);
+        const y = layout.value2y(marker.y) - radius; // вычитаем радиус, чтобы треугольник рисовался выше точки
+        ctx.beginPath();
+        ctx.moveTo(x - radius, y + radius); // начинаем от левого нижнего угла
+        ctx.lineTo(x + radius, y + radius); // линия к правому нижнему углу
+        ctx.lineTo(x, y + radius * 5); // линия к верхнему углу
+        ctx.closePath(); // замыкаем треугольник
+        ctx.fillStyle = marker.color;
+        ctx.fill();
+    }
+
+}
+
+// Make a gradient depending on the y-value
+function gradient(val) {
+    let lo = $core.layout.$lo * 1.01;
+    let hi = $core.layout.$hi * 0.99;
+    let pos = (val - lo) / (hi - lo);
+    let h = (1.0 - pos) * 240;
+    return "hsl(" + h + ", 90%, 50%)";
+}
+
+// Legend formatter, Array of [value, color] pairs
+// x represents one data item e.g. [<time>, <value>]
+function legend(x) {
+    return [
+        // [x[1], gradient(x[1])],
+        // [JSON.stringify(this), 'white'],
+        // [new Date(x[0] + _3Y).toLocaleDateString(), 'gray']
+    ];
+}
+
+function addMarker(date, y, color) {
+    markers.push({ date, y, color });
+    $events.emit('update-layout')
+    // this.make()
+    // Обновите график
+    // $events.emit('update-chart');
+}
+
+// Например, если вы хотите добавить маркер по клику на графике
+function click(event) {
+    console.log('Click event detected', $core, $events);
+    const overlay = $core.hub.mainOv;
+    const [timestamp, y] = $core.cursor.values[0][0]
+    console.log('Timestamp:', timestamp);
+    console.log('Y-coordinate:', y);
+    if (y >= 0 && y <= $core.layout.height) {
+        // Добавляем маркер через функцию скрипта
+        console.log('Adding marker...', this);
+        addMarker(timestamp, y + $props.radius / 100 * 0.7 , 'yellow'); // Замените 'yellow' на нужный цвет
+    }
+}

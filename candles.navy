@@ -1,0 +1,130 @@
+// NavyJS ~ 0.2-lite
+
+// <ds>Japanese candles with labels</ds>, format:
+// [<timestamp>, <open>, <high>, <low>, <close>, <?volume>]
+
+[OVERLAY name=CandlesWithLabels, ctx=Canvas, version=1.0.0]
+
+// Define the props
+prop('colorBodyUp', { type: 'color', def: $core.colors.candleUp })
+prop('colorBodyDw', { type: 'color', def: $core.colors.candleDw })
+prop('colorWickUp', { type: 'color', def: $core.colors.wickUp })
+prop('colorWickDw', { type: 'color', def: $core.colors.wickDw })
+prop('colorVolUp', { type: 'color', def: $core.colors.volUp })
+prop('colorVolDw', { type: 'color', def: $core.colors.volDw })
+prop('showVolume', { type: 'boolean', def: true })
+prop('currencySymbol', { type: 'string', def: '$' })
+prop('showAvgVolume', { type: 'boolean', def: true })
+prop('avgVolumeSMA', { type: 'number', def: 20 })
+prop('colorAvgVol', { type: 'color', def: '#1cccb777'})
+prop('scaleSymbol', { type: 'string|boolean', def: false })
+prop('priceLine', { type: 'boolean', def: true })
+prop('showValueTracker', { type: 'boolean', def: true })
+
+// New: Define labels
+let labels = {} // Label objects stored by timestamp
+
+// New: Add label
+addLabel(timestamp, text) {
+    if (!labels[timestamp]) {
+        labels[timestamp] = text;
+    }
+}
+
+// New: Remove label
+removeLabel(timestamp) {
+    if (labels[timestamp]) {
+        delete labels[timestamp];
+    }
+}
+
+// Draw call
+draw(ctx) {
+    console.log('ctx')
+    let cnv = $lib.layoutCnv($core, true, $props.showVolume)
+    let bodies = cnv.upBodies.length ? cnv.upBodies : cnv.dwBodies
+    if (!bodies.length) return
+    let w = Math.max(bodies[0].w, 1)
+
+    drawCvPart(ctx, $lib.candleWick, cnv.dwWicks, 1, 'colorWickDw')
+    drawCvPart(ctx, $lib.candleWick, cnv.upWicks, 1, 'colorWickUp')
+    drawCvPart(ctx, $lib.candleBody, cnv.dwBodies, w, 'colorBodyDw')
+    drawCvPart(ctx, $lib.candleBody, cnv.upBodies, w, 'colorBodyUp')
+    drawCvPart(ctx, $lib.volumeBar, cnv.dwVolbars, w, 'colorVolDw')
+    drawCvPart(ctx, $lib.volumeBar, cnv.upVolbars, w, 'colorVolUp')
+
+    if ($props.showVolume && $props.showAvgVolume) {
+        $lib.avgVolume(ctx, $core, $props, cnv)
+    }
+
+    // New: Draw labels
+    for (let timestamp in labels) {
+        let text = labels[timestamp];
+        drawLabel(ctx, timestamp, text);
+    }
+}
+
+// Draw candle part
+drawCvPart(ctx, f, arr, w, color) {
+    let layout = $core.layout
+    ctx.lineWidth = w
+    ctx.strokeStyle = $props[color]
+    ctx.beginPath()
+    for (var i = 0, n = arr.length; i < n; i++) {
+        f(ctx, arr[i], layout)
+    }
+    ctx.stroke()
+}
+
+// New: Draw label
+drawLabel(ctx, timestamp, text) {
+    // Convert timestamp to x coordinate
+    console.log(timestamp, text, $core.layout)
+    let x = $core.layout.ti2x(timestamp);
+
+    // Find the candle for this timestamp
+    let candle = $core.data.find(c => c[0] === timestamp);
+    if (!candle) return;
+
+    // Convert candle high price to y coordinate
+    let y = $core.layout.$2screen(candle[2]);
+
+    // Define label properties
+    let radius = 10; // Radius of the label circle
+    let checkMarkSize = 5; // Size of the check mark inside the label
+
+    // Draw label circle
+    ctx.beginPath();
+    ctx.arc(x, y - radius * 2, radius, 0, 2 * Math.PI, false);
+    ctx.fillStyle = 'white'; // Color of the label circle
+    ctx.fill();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'black'; // Color of the label border
+    ctx.stroke();
+
+    // Draw check mark inside the label
+    ctx.beginPath();
+    ctx.moveTo(x - checkMarkSize / 2, y - radius * 2);
+    ctx.lineTo(x, y - radius * 2 + checkMarkSize / 2);
+    ctx.lineTo(x + checkMarkSize / 2, y - radius * 2 - checkMarkSize / 2);
+    ctx.strokeStyle = 'green'; // Color of the check mark
+    ctx.lineWidth = 2;
+    ctx.stroke();
+}
+
+click(event) {
+    // Convert mouse position to timestamp
+    console.log($core.cursor.time)
+    let timestamp = $core.cursor.time;
+
+    // Find the candle for this timestamp
+    let candle = $core.data.find(c => c[0] === timestamp);
+    if (!candle) return;
+
+    // Add or remove label
+    if (labels[timestamp]) {
+        removeLabel(timestamp);
+    } else {
+        addLabel(timestamp, "Label");
+    }
+}
